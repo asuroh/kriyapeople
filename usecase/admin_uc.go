@@ -4,6 +4,8 @@ import (
 	"errors"
 	"kriyapeople/helper"
 	"kriyapeople/model"
+	"kriyapeople/pkg/bcrypt"
+	"kriyapeople/pkg/interfacepkg"
 	"kriyapeople/pkg/logruslogger"
 	"kriyapeople/pkg/str"
 	"kriyapeople/server/request"
@@ -17,38 +19,23 @@ type AdminUC struct {
 	*ContractUC
 }
 
-// GenerateCode randomize code & check uniqueness from DB
-func (uc AdminUC) GenerateCode() (res string, err error) {
-	m := model.NewAdminModel(uc.DB)
-	res = str.RandAlphanumericString(8)
-	for {
-		data, _ := m.FindByCode(res)
-		if data.ID == "" {
-			break
-		}
-		res = str.RandAlphanumericString(8)
-	}
-
-	return res, err
-}
-
 // BuildBody ...
-func (uc AdminUC) BuildBody(data *model.AdminEntity, res *viewmodel.AdminVM, isShowPassword bool) {
+func (uc AdminUC) BuildBody(data *model.UserEntity, res *viewmodel.UserVM, isShowPassword bool) {
 
 	res.ID = data.ID
-	res.UserName = data.UserName.String
-	res.Email = data.Email.String
-	res.Password = str.ShowString(isShowPassword, uc.Aes.DecryptNoErr(data.Password.String))
+	res.Information.UserName = data.UserName.String
+	res.Information.Email = data.Email.String
+	res.Information.Password = str.ShowString(isShowPassword, data.Password.String)
 	res.RoleID = data.RoleID.String
 	res.RoleName = data.Role.Name.String
-	res.Status = data.Status.Bool
+	res.Information.Status.IsActive = data.Status.Bool
 	res.CreatedAt = data.CreatedAt
 	res.UpdatedAt = data.UpdatedAt
 	res.DeletedAt = data.DeletedAt.String
 }
 
 // Login ...
-func (uc AdminUC) Login(data request.AdminLoginRequest) (res viewmodel.JwtVM, err error) {
+func (uc AdminUC) Login(data request.UserLoginRequest) (res viewmodel.JwtVM, err error) {
 	ctx := "AdminUC.Login"
 
 	if len(data.Password) < 8 {
@@ -61,11 +48,14 @@ func (uc AdminUC) Login(data request.AdminLoginRequest) (res viewmodel.JwtVM, er
 		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "find_by_email", uc.ReqID)
 		return res, errors.New(helper.InvalidCredentials)
 	}
-	if admin.Password != data.Password {
+
+	isMatch := bcrypt.CheckPasswordHash(data.Password, admin.Information.Password)
+	if !isMatch {
 		logruslogger.Log(logruslogger.WarnLevel, "", ctx, "invalid_password", uc.ReqID)
 		return res, errors.New(helper.InvalidCredentials)
 	}
-	if !admin.Status {
+
+	if !admin.Information.Status.IsActive {
 		logruslogger.Log(logruslogger.WarnLevel, "", ctx, "inactive_admin", uc.ReqID)
 		return res, errors.New(helper.InactiveAdmin)
 	}
@@ -85,35 +75,8 @@ func (uc AdminUC) Login(data request.AdminLoginRequest) (res viewmodel.JwtVM, er
 	return res, err
 }
 
-// SelectAll ...
-func (uc AdminUC) SelectAll(search, by, sort string) (res []viewmodel.AdminVM, err error) {
-	ctx := "AdminUC.SelectAll"
-
-	if !str.Contains(model.AdminBy, by) {
-		by = model.DefaultAdminBy
-	}
-	if !str.Contains(SortWhitelist, strings.ToLower(sort)) {
-		sort = DescSort
-	}
-
-	m := model.NewAdminModel(uc.DB)
-	data, err := m.SelectAll(search, by, sort)
-	if err != nil {
-		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "query", uc.ReqID)
-		return res, err
-	}
-
-	for _, r := range data {
-		temp := viewmodel.AdminVM{}
-		uc.BuildBody(&r, &temp, false)
-		res = append(res, temp)
-	}
-
-	return res, err
-}
-
 // FindAll ...
-func (uc AdminUC) FindAll(search string, page, limit int, by, sort string) (res []viewmodel.AdminVM, pagination viewmodel.PaginationVM, err error) {
+func (uc AdminUC) FindAll(search string, page, limit int, by, sort string) (res []viewmodel.UserVM, pagination viewmodel.PaginationVM, err error) {
 	ctx := "AdminUC.FindAll"
 
 	if !str.Contains(model.AdminBy, by) {
@@ -135,7 +98,7 @@ func (uc AdminUC) FindAll(search string, page, limit int, by, sort string) (res 
 	pagination = PaginationRes(page, count, limit)
 
 	for _, r := range data {
-		temp := viewmodel.AdminVM{}
+		temp := viewmodel.UserVM{}
 		uc.BuildBody(&r, &temp, false)
 		res = append(res, temp)
 	}
@@ -144,7 +107,7 @@ func (uc AdminUC) FindAll(search string, page, limit int, by, sort string) (res 
 }
 
 // FindByID ...
-func (uc AdminUC) FindByID(id string, isShowPassword bool) (res viewmodel.AdminVM, err error) {
+func (uc AdminUC) FindByID(id string, isShowPassword bool) (res viewmodel.UserVM, err error) {
 	ctx := "AdminUC.FindByID"
 
 	m := model.NewAdminModel(uc.DB)
@@ -158,23 +121,8 @@ func (uc AdminUC) FindByID(id string, isShowPassword bool) (res viewmodel.AdminV
 	return res, err
 }
 
-// FindByCode ...
-func (uc AdminUC) FindByCode(code string, isShowPassword bool) (res viewmodel.AdminVM, err error) {
-	ctx := "AdminUC.FindByCode"
-
-	m := model.NewAdminModel(uc.DB)
-	data, err := m.FindByCode(code)
-	if err != nil {
-		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "query", uc.ReqID)
-		return res, err
-	}
-	uc.BuildBody(&data, &res, isShowPassword)
-
-	return res, err
-}
-
 // FindByEmail ...
-func (uc AdminUC) FindByEmail(email string, isShowPassword bool) (res viewmodel.AdminVM, err error) {
+func (uc AdminUC) FindByEmail(email string, isShowPassword bool) (res viewmodel.UserVM, err error) {
 	ctx := "AdminUC.FindByEmail"
 
 	m := model.NewAdminModel(uc.DB)
@@ -190,42 +138,29 @@ func (uc AdminUC) FindByEmail(email string, isShowPassword bool) (res viewmodel.
 }
 
 // CheckDetails ...
-func (uc AdminUC) CheckDetails(userID string, data *request.AdminRequest, oldData *viewmodel.AdminVM) (err error) {
+func (uc AdminUC) CheckDetails(data *request.UserRequest, oldData *viewmodel.UserVM) (err error) {
 	ctx := "AdminUC.CheckDetails"
 
-	admin, _ := uc.FindByEmail(data.Email, false)
+	admin, _ := uc.FindByEmail(data.Information.Email, false)
 	if admin.ID != "" && admin.ID != oldData.ID {
-		logruslogger.Log(logruslogger.WarnLevel, data.Email, ctx, "duplicate_email", uc.ReqID)
+		logruslogger.Log(logruslogger.WarnLevel, data.Information.Email, ctx, "duplicate_email", uc.ReqID)
 		return errors.New(helper.DuplicateEmail)
 	}
 
-	if data.Password == "" && oldData.Password == "" {
-		logruslogger.Log(logruslogger.WarnLevel, data.Email, ctx, "empty_password", uc.ReqID)
+	if data.Information.Password == "" && oldData.Information.Password == "" {
+		logruslogger.Log(logruslogger.WarnLevel, data.Information.Email, ctx, "empty_password", uc.ReqID)
 		return errors.New(helper.InvalidPassword)
 	}
 
 	// Decrypt password input
-	if data.Password != "" {
-		data.Password, err = uc.AesFront.Decrypt(data.Password)
-		if err != nil {
-			logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "decrypt", uc.ReqID)
-			return err
-		}
-	} else {
-		data.Password = oldData.Password
+	if data.Information.Password == "" {
+		data.Information.Password = oldData.Information.Password
 	}
 
 	// Encrypt password
-	data.Password, err = uc.Aes.Encrypt(data.Password)
+	data.Information.Password, err = bcrypt.HashPassword(data.Information.Password)
 	if err != nil {
 		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "encrypt_password", uc.ReqID)
-		return err
-	}
-
-	// Generate code
-	data.Code, err = uc.GenerateCode()
-	if err != nil {
-		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "generate_code", uc.ReqID)
 		return err
 	}
 
@@ -233,24 +168,27 @@ func (uc AdminUC) CheckDetails(userID string, data *request.AdminRequest, oldDat
 }
 
 // Create ...
-func (uc AdminUC) Create(userID string, data *request.AdminRequest) (res viewmodel.AdminVM, err error) {
+func (uc AdminUC) Create(data *request.UserRequest) (res viewmodel.UserVM, err error) {
 	ctx := "AdminUC.Create"
 
-	err = uc.CheckDetails(userID, data, &res)
+	err = uc.CheckDetails(data, &res)
 	if err != nil {
 		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "check_details", uc.ReqID)
 		return res, err
 	}
 
+	information := viewmodel.UserDataVM{
+		UserName: data.Information.UserName,
+		Email:    data.Information.Email,
+	}
+
 	now := time.Now().UTC()
-	res = viewmodel.AdminVM{
-		// UserName:  data.UserName,
-		Email:     data.Email,
-		Password:  data.Password,
-		RoleID:    data.RoleID,
-		Status:    data.Status,
-		CreatedAt: now.Format(time.RFC3339),
-		UpdatedAt: now.Format(time.RFC3339),
+	res = viewmodel.UserVM{
+		RoleID:      data.RoleID,
+		Information: information,
+		Data:        interfacepkg.Marshall(data.Information),
+		CreatedAt:   now.Format(time.RFC3339),
+		UpdatedAt:   now.Format(time.RFC3339),
 	}
 	m := model.NewAdminModel(uc.DB)
 	res.ID, err = m.Store(res, now)
@@ -263,7 +201,7 @@ func (uc AdminUC) Create(userID string, data *request.AdminRequest) (res viewmod
 }
 
 // Update ...
-func (uc AdminUC) Update(userID, id string, data *request.AdminRequest) (res viewmodel.AdminVM, err error) {
+func (uc AdminUC) Update(id string, data *request.UserRequest) (res viewmodel.UserVM, err error) {
 	ctx := "AdminUC.Update"
 
 	oldData, err := uc.FindByID(id, true)
@@ -272,20 +210,23 @@ func (uc AdminUC) Update(userID, id string, data *request.AdminRequest) (res vie
 		return res, err
 	}
 
-	err = uc.CheckDetails(userID, data, &oldData)
+	err = uc.CheckDetails(data, &oldData)
 	if err != nil {
 		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "check_details", uc.ReqID)
 		return res, err
 	}
 
+	information := viewmodel.UserDataVM{
+		UserName: data.Information.UserName,
+		Email:    data.Information.Email,
+	}
+
 	now := time.Now().UTC()
-	res = viewmodel.AdminVM{
-		// Name:           data.Name,
-		Email:     data.Email,
-		Password:  data.Password,
-		RoleID:    data.RoleID,
-		Status:    data.Status,
-		UpdatedAt: now.Format(time.RFC3339),
+	res = viewmodel.UserVM{
+		RoleID:      data.RoleID,
+		Information: information,
+		Data:        interfacepkg.Marshall(data.Information),
+		UpdatedAt:   now.Format(time.RFC3339),
 	}
 	m := model.NewAdminModel(uc.DB)
 	res.ID, err = m.Update(id, res, now)
@@ -297,30 +238,8 @@ func (uc AdminUC) Update(userID, id string, data *request.AdminRequest) (res vie
 	return res, err
 }
 
-// UpdatePassword ...
-func (uc AdminUC) UpdatePassword(id, password string) (res viewmodel.AdminVM, err error) {
-	ctx := "AdminUC.UpdatePassword"
-
-	// Encrypt password
-	password, err = uc.Aes.Encrypt(password)
-	if err != nil {
-		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "encrypt_password", uc.ReqID)
-		return res, err
-	}
-
-	now := time.Now().UTC()
-	adminModel := model.NewAdminModel(uc.DB)
-	res.ID, err = adminModel.UpdatePassword(id, password, now)
-	if err != nil {
-		logruslogger.Log(logruslogger.WarnLevel, err.Error(), ctx, "query", uc.ReqID)
-		return res, err
-	}
-
-	return res, err
-}
-
 // Delete ...
-func (uc AdminUC) Delete(id string) (res viewmodel.AdminVM, err error) {
+func (uc AdminUC) Delete(id string) (res viewmodel.UserVM, err error) {
 	ctx := "AdminUC.Delete"
 
 	now := time.Now().UTC()

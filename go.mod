@@ -28,7 +28,7 @@ require (
 	github.com/spf13/viper v1.7.0
 	github.com/streadway/amqp v1.0.0
 	github.com/ulule/limiter/v3 v3.5.0
-	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899 // indirect
+	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect

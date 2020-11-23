@@ -11,8 +11,27 @@ type AdminRequest struct {
 	Status         bool   `json:"status"`
 }
 
-// AdminLoginRequest ....
-type AdminLoginRequest struct {
+// UserRequest ...
+type UserRequest struct {
+	RoleID      string          `json:"role_id"`
+	Information UserDataRequest `json:"information"`
+}
+
+// UserDataRequest ...
+type UserDataRequest struct {
+	Email    string        `json:"email"`
+	Status   StatusRequest `json:"status"`
+	Password string        `json:"password"`
+	UserName string        `json:"username"`
+}
+
+// StatusRequest ...
+type StatusRequest struct {
+	IsActive bool `json:"is_active"`
+}
+
+// UserLoginRequest ....
+type UserLoginRequest struct {
 	Email    string `json:"email" validate:"email"`
 	Password string `json:"password" validate:"required"`
 }

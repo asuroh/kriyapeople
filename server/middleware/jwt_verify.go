@@ -130,156 +130,6 @@ func (m VerifyMiddlewareInit) verifyRefreshJWT(r *http.Request, role string) (re
 	return res, nil
 }
 
-// VerifyRefreshTokenCredential ...
-func (m VerifyMiddlewareInit) VerifyRefreshTokenCredential(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jweRes, err := m.verifyRefreshJWT(r, "user")
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, err.Error(), []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check id in user table
-		userUc := usecase.UserUC{ContractUC: m.ContractUC}
-		_, err = userUc.FindByID(jweRes["id"].(string), false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user token!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		ctx := userContextInterface(r.Context(), r, "user", jweRes)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// VerifyUserToken ...
-func (m VerifyMiddlewareInit) VerifyUserToken(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jweRes, err := m.verifyJWT(r, "user", false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, err.Error(), []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check id in user table
-		userUc := usecase.UserUC{ContractUC: m.ContractUC}
-		user, err := userUc.FindByID(jweRes["id"].(string), false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user token!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		if !user.Status {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user status!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		jweRes["email"] = user.Email
-		jweRes["status"] = user.Status
-
-		ctx := userContextInterface(r.Context(), r, "user", jweRes)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// VerifyUserEmailInvalidToken ...
-func (m VerifyMiddlewareInit) VerifyUserEmailInvalidToken(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jweRes, err := m.verifyJWT(r, "user", false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, err.Error(), []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check id in user table
-		userUc := usecase.UserUC{ContractUC: m.ContractUC}
-		user, err := userUc.FindByID(jweRes["id"].(string), false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user token!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		if !user.Status {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user status!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-		if user.EmailValidAt != "" {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid email!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		jweRes["email"] = user.Email
-		jweRes["status"] = user.Status
-
-		ctx := userContextInterface(r.Context(), r, "user", jweRes)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// VerifyUserEmailValidToken ...
-func (m VerifyMiddlewareInit) VerifyUserEmailValidToken(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jweRes, err := m.verifyJWT(r, "user", false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, err.Error(), []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check id in user table
-		userUc := usecase.UserUC{ContractUC: m.ContractUC}
-		user, err := userUc.FindByID(jweRes["id"].(string), false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user token!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		if !user.Status {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid user status!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-		if user.EmailValidAt == "" {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid email!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		jweRes["email"] = user.Email
-		jweRes["status"] = user.Status
-
-		ctx := userContextInterface(r.Context(), r, "user", jweRes)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// VerifyUserForgotPasswordTokenCredential ...
-func (m VerifyMiddlewareInit) VerifyUserForgotPasswordTokenCredential(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jweRes, err := m.verifyJWT(r, "user", false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, err.Error(), []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check id in table
-		userUc := usecase.UserUC{ContractUC: m.ContractUC}
-		user, err := userUc.FindByID(jweRes["id"].(string), true)
-		if user.ID == "" {
-			apiHandler.RespondWithJSON(w, 401, 401, "Not found!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check last action
-		lastAction := ""
-		m.ContractUC.GetFromRedis("latestAction"+user.ID, &lastAction)
-		if lastAction != usecase.VerifyKey {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid action!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		ctx := userContextInterface(r.Context(), r, "user", jweRes)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 // VerifySuperadminTokenCredential ...
 func (m VerifyMiddlewareInit) VerifySuperadminTokenCredential(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -297,11 +147,11 @@ func (m VerifyMiddlewareInit) VerifySuperadminTokenCredential(next http.Handler)
 			return
 		}
 		if admin.RoleName != model.RoleCodeSuperadmin {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid Role!", []map[string]interface{}{}, []map[string]interface{}{})
+			apiHandler.RespondWithJSON(w, 401, 401, "only admin can access", []map[string]interface{}{}, []map[string]interface{}{})
 			return
 		}
 
-		jweRes["userName"] = admin.UserName
+		jweRes["userName"] = admin.Information.UserName
 		jweRes["roleName"] = admin.RoleName
 
 		ctx := userContextInterface(r.Context(), r, "user", jweRes)
@@ -326,38 +176,8 @@ func (m VerifyMiddlewareInit) VerifyAdminTokenCredential(next http.Handler) http
 			return
 		}
 
-		jweRes["userName"] = admin.UserName
+		jweRes["userName"] = admin.Information.UserName
 		jweRes["roleName"] = admin.RoleName
-
-		ctx := userContextInterface(r.Context(), r, "user", jweRes)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// VerifyAdminForgotPasswordTokenCredential ...
-func (m VerifyMiddlewareInit) VerifyAdminForgotPasswordTokenCredential(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jweRes, err := m.verifyJWT(r, "admin", false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, err.Error(), []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check id in table
-		adminUc := usecase.AdminUC{ContractUC: m.ContractUC}
-		admin, err := adminUc.FindByID(jweRes["id"].(string), false)
-		if err != nil {
-			apiHandler.RespondWithJSON(w, 401, 401, "Not found!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
-
-		// Check last action
-		lastAction := ""
-		m.ContractUC.GetFromRedis("latestAction"+admin.ID, &lastAction)
-		if lastAction != usecase.VerifyKey {
-			apiHandler.RespondWithJSON(w, 401, 401, "Invalid action!", []map[string]interface{}{}, []map[string]interface{}{})
-			return
-		}
 
 		ctx := userContextInterface(r.Context(), r, "user", jweRes)
 		next.ServeHTTP(w, r.WithContext(ctx))

@@ -19,7 +19,7 @@ type AdminHandler struct {
 
 // LoginHandler ...
 func (h *AdminHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
-	req := request.AdminLoginRequest{}
+	req := request.UserLoginRequest{}
 	if err := h.Handler.Bind(r, &req); err != nil {
 		SendBadRequest(w, err.Error())
 		return
@@ -86,46 +86,9 @@ func (h *AdminHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// GetByCodeHandler ...
-func (h *AdminHandler) GetByCodeHandler(w http.ResponseWriter, r *http.Request) {
-	code := chi.URLParam(r, "code")
-	if code == "" {
-		SendBadRequest(w, "Parameter must be filled")
-		return
-	}
-
-	adminUc := usecase.AdminUC{ContractUC: h.ContractUC}
-	res, err := adminUc.FindByCode(code, false)
-	if err != nil {
-		SendBadRequest(w, err.Error())
-		return
-	}
-
-	SendSuccess(w, res, nil)
-	return
-}
-
-// GetByTokenHandler ...
-func (h *AdminHandler) GetByTokenHandler(w http.ResponseWriter, r *http.Request) {
-	userID := requestKeyFromContextInterface(r.Context(), "user", "id")
-
-	adminUc := usecase.AdminUC{ContractUC: h.ContractUC}
-	res, err := adminUc.FindByID(userID, false)
-	if err != nil {
-		SendBadRequest(w, err.Error())
-		return
-	}
-
-	SendSuccess(w, res, nil)
-	return
-}
-
 // CreateHandler ...
 func (h *AdminHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
-	user := requestIDFromContextInterface(r.Context(), "user")
-	userID := user["id"].(string)
-
-	req := request.AdminRequest{}
+	req := request.UserRequest{}
 	if err := h.Handler.Bind(r, &req); err != nil {
 		SendBadRequest(w, err.Error())
 		return
@@ -136,7 +99,7 @@ func (h *AdminHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	adminUc := usecase.AdminUC{ContractUC: h.ContractUC}
-	res, err := adminUc.Create(userID, &req)
+	res, err := adminUc.Create(&req)
 	if err != nil {
 		SendBadRequest(w, err.Error())
 		return
@@ -148,15 +111,13 @@ func (h *AdminHandler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateHandler ...
 func (h *AdminHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
-	userID := requestKeyFromContextInterface(r.Context(), "user", "id")
-
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		SendBadRequest(w, "Parameter must be filled")
 		return
 	}
 
-	req := request.AdminRequest{}
+	req := request.UserRequest{}
 	if err := h.Handler.Bind(r, &req); err != nil {
 		SendBadRequest(w, err.Error())
 		return
@@ -167,32 +128,7 @@ func (h *AdminHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	adminUc := usecase.AdminUC{ContractUC: h.ContractUC}
-	res, err := adminUc.Update(userID, id, &req)
-	if err != nil {
-		SendBadRequest(w, err.Error())
-		return
-	}
-
-	SendSuccess(w, res, nil)
-	return
-}
-
-// UpdateByTokenHandler ...
-func (h *AdminHandler) UpdateByTokenHandler(w http.ResponseWriter, r *http.Request) {
-	userID := requestKeyFromContextInterface(r.Context(), "user", "id")
-
-	req := request.AdminRequest{}
-	if err := h.Handler.Bind(r, &req); err != nil {
-		SendBadRequest(w, err.Error())
-		return
-	}
-	if err := h.Handler.Validate.Struct(req); err != nil {
-		h.SendRequestValidationError(w, err.(validator.ValidationErrors))
-		return
-	}
-
-	adminUc := usecase.AdminUC{ContractUC: h.ContractUC}
-	res, err := adminUc.Update(userID, userID, &req)
+	res, err := adminUc.Update(id, &req)
 	if err != nil {
 		SendBadRequest(w, err.Error())
 		return
